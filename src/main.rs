@@ -12,5 +12,7 @@ fn main() {
         Ok((pid, arg)) => println!("{} started as PID {}", arg, pid),
         Err(e) => println!("fork failed: {e}")
     };
-    loop {}
+    loop {
+        nix::unistd::pause();
+    }
 }

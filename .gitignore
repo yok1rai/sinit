@@ -1,0 +1,10 @@
+
+# Rust build output
+/target/
+
+# Generated initramfs
+/initramfs.cpio
+
+# Generated/compiled initramfs binaries
+/initramfs/init
+/initramfs/bin/bash

@@ -1,0 +1,48 @@
+# Architecture of the sinit (simple init)
+
+Kernel
+│
+▼
+PID 1 / Sinit
+│
+├── Mount virtual filesystems
+│   ├── Success → continue
+│   └── Failure → drop to emergency shell
+│
+├── Mount real filesystems
+│   ├── Necessary
+│   │   ├── Success → continue
+│   │   └── Failure → drop to emergency shell
+│   │
+│   ├── Prompt
+│   │   ├── Success → continue
+│   │   └── Failure → prompt the user
+│   │       ├── y → continue booting
+│   │       └── n → drop to emergency shell
+│   │
+│   └── Skip
+│       ├── Success → continue
+│       └── Failure → log the error and continue
+│
+├── Initialize the system
+│   ├── set hostname
+│   ├── set up networking prerequisites
+│   └── load kernel modules
+├──  Start default services
+│    ├── Success → continue
+│    └── Failure
+│       ├── Log the error
+│       └── Continue starting unrelated services
+├── Enter running state
+│   └── wait / supervise
+│       ├── reap orphaned processes
+│       ├── handle SIGCHILD
+│       ├── Restart services configured for restart
+│       ├── Respond to shutdown/reboot requests
+│       └── if user enters 'in!tpaniC' into command line tool
+│           └── kill init: instant kernel panic
+└── reboot / shutdown
+    ├── stop all services
+    ├── unmount filesystems
+    ├── sync
+    └── kernel shutdown / reboot

@@ -1,21 +1,9 @@
-use nix::unistd::{execv, fork, ForkResult};
-use std::ffi::CString;
+use sinit::*; 
 
 fn main() {
-    match unsafe { fork() } {
-        Ok(ForkResult::Child) => {
-            let bash = CString::new("/bin/bash").unwrap();
-
-            execv(&bash, &[bash.clone()]).unwrap();
-
-            unreachable!();
-        }
-        Ok(ForkResult::Parent { child }) => {
-            println!("bash started as PID {}", child);
-        }
-        Err(e) => {
-            println!("fork failed: {e}");
-        }
-    }
+    match fork_exec("/bin/sh") {
+        Ok((pid, arg)) => println!("{} started as PID {}", arg, pid),
+        Err(e) => println!("fork failed: {e}")
+    };
     loop {}
 }

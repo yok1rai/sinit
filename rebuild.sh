@@ -17,3 +17,13 @@ rm -f initramfs.cpio
 )
 
 echo "==> Done!"
+
+if [[ "$1" == "--run" || "$1" == "-r" ]]; then
+    echo "==> Booting in QEMU..."
+    qemu-system-x86_64 \
+            -kernel /boot/vmlinuz-linux \
+            -initrd initramfs.cpio \
+            -append "console=ttyS0 rdinit=/init" \
+            -m 1G \
+            -nographic
+fi

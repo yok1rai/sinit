@@ -17,11 +17,16 @@ fn spawn_shell() -> Option<Pid> {
 }
 
 #[cfg(feature = "unsafe")]
-unsafe fn ipanic() {
+fn ipanic() {
     if !getuid().is_root() {
         eprintln!("you need to run as root");
         return;
     }
+    if let Err(e) = std::fs::write("/etc/ipanic", b"") {
+        eprintln!("cannot clear the /etc/ipanic, canceling...");
+        return;
+    }
+    nix::unistd::sync();
     std::process::exit(0);
 }
 
@@ -30,9 +35,7 @@ fn check_ipanic() {
     if let Ok(content) = std::fs::read_to_string("/etc/ipanic") {
         if content.trim() == "panic" {
             println!("panic triggered!");
-            unsafe {
-                ipanic();
-            }
+            ipanic();
         }
     }
 }

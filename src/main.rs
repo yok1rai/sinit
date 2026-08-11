@@ -1,15 +1,17 @@
 use sinit::*;
 
 fn main() {
-    signal::init().expect("failed to initialize signal handling");
-
-    match mount::mount_vf() {
-        Ok(()) => {},
-        Err(e) => {
-            eprintln!("failed to mount virtual filesystem: {e}");
-            return;
-        }
+    if let Err(e) = signal::init() {
+        eprintln!("failed to initialize signal handling: {e}");
     }
+    if let Err(e) =  mount::mount_vf() {
+        eprintln!("failed to mount virtual filesystems: {e}");
+    }
+
+    if let Err(e) = process::setup_stdio() {
+        eprintln!("failed to setup stdio redirection: {e}"); 
+    }
+
     match process::fork_exec("/bin/sh") {
         Ok((pid, arg)) => println!("{} started as PID {}", arg, pid),
         Err(e) => println!("fork failed: {e}")
@@ -18,7 +20,7 @@ fn main() {
         process::reap_chd();
 
         if let Err(e) = signal::wait() {
-            eprintln!("failed to wait for signal: {e}"); 
+            eprintln!("failed to wait for signal: {e}");
         }
     }
 }

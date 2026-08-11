@@ -1,6 +1,6 @@
 [package]
 name = "sinit"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 
 [dependencies]
@@ -9,5 +9,7 @@ nix = { version = "0.30", features = [
     "user",
     "mount",
     "signal",
-    "time"
+    "time",
+    "fs"
 ] }
+libc = "0.2"

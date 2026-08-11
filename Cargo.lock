@@ -40,7 +40,8 @@ dependencies = [
 
 [[package]]
 name = "sinit"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
+ "libc",
  "nix",
 ]

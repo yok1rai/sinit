@@ -1,9 +1,6 @@
 use libc::{ioctl, TIOCSCTTY};
 use nix::{
-    unistd::{execv, fork, ForkResult, Pid, setsid},
-    sys::wait::{waitpid, WaitPidFlag, WaitStatus},
-    fcntl::{open, OFlag},
-    sys::stat::Mode
+    fcntl::{OFlag, open}, sys::{signal::{self, SigSet}, stat::Mode, wait::{WaitPidFlag, WaitStatus, waitpid}}, unistd::{ForkResult, Pid, execv, fork, setsid}
 };
 use std::{ffi::CString, os::fd::AsRawFd};
 use crate::utils;
@@ -25,10 +22,14 @@ pub fn setup_stdio() -> nix::Result<()> {
 pub fn fork_exec(args: &str) -> nix::Result<(Pid, &str)> {
     match unsafe { fork()? } {
         ForkResult::Child => {
+            signal::sigprocmask(
+                signal::SigmaskHow::SIG_SETMASK,
+                Some(&SigSet::empty()),
+                None)?;
             setsid()?;
 
             unsafe {
-                ioctl(0, TIOCSCTTY as _, 0); 
+                ioctl(0, TIOCSCTTY as _, 0);
             }
 
             let path = CString::new(args).unwrap();
@@ -40,7 +41,8 @@ pub fn fork_exec(args: &str) -> nix::Result<(Pid, &str)> {
     }
 }
 
-pub fn reap_chd() {
+pub fn reap_chd() -> Vec<Pid> {
+    let mut reaped = Vec::new();
     loop {
         match waitpid(
             Pid::from_raw(-1),
@@ -48,9 +50,11 @@ pub fn reap_chd() {
         ) {
             Ok(WaitStatus::Exited(pid, status)) => {
                 println!("{} reaped PID {pid}, exit status: {status}", utils::boot_time());
+                reaped.push(pid);
             }
             Ok(WaitStatus::Signaled(pid, signal, _)) => {
                 println!("{} reaped PID {pid}, killed by signal {signal}", utils::boot_time());
+                reaped.push(pid);
             }
             Ok(WaitStatus::StillAlive) => {
                 break;
@@ -65,4 +69,5 @@ pub fn reap_chd() {
             }
         }
     }
+    reaped
 }

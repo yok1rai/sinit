@@ -5,6 +5,8 @@ use std::{
     fs
 };
 
+use crate::utils;
+
 pub fn mount_fs(source: Option<&str>, target: &str, fstype: Option<&str>) -> nix::Result<()> {
     mount(
         source,
@@ -29,10 +31,11 @@ pub fn mount_vf() -> nix::Result<()> {
         match mount_fs(*source, target, Some(fstype)) {
             Ok(()) => {
                 println!(
-                    "[{}/{}] {} successfully mounted",
+                    "* [{}/{}] {} successfully mounted {}",
                     idx + 1,
                     vfs.len(),
-                    target
+                    target,
+                    utils::boot_time()
                 );
             }
             Err(Errno::ENOENT) => {
@@ -42,10 +45,11 @@ pub fn mount_vf() -> nix::Result<()> {
                 mount_fs(*source, target, Some(fstype))?;
 
                 println!(
-                    "[{}/{}] {} successfully mounted",
+                    "* [{}/{}] {} successfully mounted {}",
                     idx + 1,
                     vfs.len(),
-                    target
+                    target,
+                    utils::boot_time()
                 );
             }
             Err(e) => {
@@ -53,6 +57,6 @@ pub fn mount_vf() -> nix::Result<()> {
             }
         };
     }
-    println!("every virtual filesystems are mounted!"); 
+    println!("{} every virtual filesystems are mounted!", utils::boot_time());
     Ok(())
 }

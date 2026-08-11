@@ -1,6 +1,8 @@
 use sinit::*;
 
 fn main() {
+    signal::init().expect("failed to initialize signal handling");
+
     match mount::mount_vf() {
         Ok(()) => {},
         Err(e) => {
@@ -13,6 +15,10 @@ fn main() {
         Err(e) => println!("fork failed: {e}")
     };
     loop {
-        nix::unistd::pause();
+        process::reap_chd();
+
+        if let Err(e) = signal::wait() {
+            eprintln!("failed to wait for signal: {e}"); 
+        }
     }
 }

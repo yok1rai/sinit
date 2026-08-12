@@ -1,41 +1,25 @@
 use sinit::*;
-use nix::unistd::{Pid, getuid};
+
 #[cfg(feature = "unsafe")]
 use std::{thread, time::Duration};
 
-fn spawn_shell() -> Option<Pid> {
-    match process::fork_exec("/bin/sh") {
-        Ok((pid, arg)) => {
-            println!("{} started as PID {}", arg, pid);
-            Some(pid)
+fn spawn(
+    command: process::Command,
+    running: &mut process::RunningProcess,
+) -> bool {
+    match process::fork_exec(command.clone(), running) {
+        Ok(pid) => {
+            println!(
+                "{} started process '{}' as PID {}",
+                utils::boot_time(),
+                command.path,
+                pid
+            );
+            true
         }
         Err(e) => {
-            eprintln!("fork failed: {e}");
-            None
-        }
-    }
-}
-
-#[cfg(feature = "unsafe")]
-fn ipanic() {
-    if !getuid().is_root() {
-        eprintln!("you need to run as root");
-        return;
-    }
-    if let Err(e) = std::fs::write("/etc/ipanic", b"") {
-        eprintln!("cannot clear the /etc/ipanic, canceling...");
-        return;
-    }
-    nix::unistd::sync();
-    std::process::exit(0);
-}
-
-#[cfg(feature =  "unsafe")]
-fn check_ipanic() {
-    if let Ok(content) = std::fs::read_to_string("/etc/ipanic") {
-        if content.trim() == "panic" {
-            println!("panic triggered!");
-            ipanic();
+            eprintln!("fork failed for '{}': {e}", command.path);
+            false
         }
     }
 }
@@ -44,7 +28,8 @@ fn main() {
     if let Err(e) = signal::init() {
         eprintln!("failed to initialize signal handling: {e}");
     }
-    if let Err(e) =  mount::mount_vf() {
+
+    if let Err(e) = mount::mount_vf() {
         eprintln!("failed to mount virtual filesystems: {e}");
     }
 
@@ -55,23 +40,62 @@ fn main() {
     #[cfg(feature = "unsafe")]
     thread::spawn(|| {
         loop {
-            use std::time::Duration;
-
-            check_ipanic();
+            panic::check_ipanic();
             thread::sleep(Duration::from_millis(500));
         }
     });
 
-    let mut shell_pid = spawn_shell();
+    let mut processes = Vec::new();
+
+    if let Some(cmd) = process::Command::new(
+        vec!["/bin/sh"],
+        process::RestartPolicy::Always,
+    ) {
+        let mut running = process::RunningProcess {
+            process: Vec::new(),
+            command: cmd.clone(),
+        };
+
+        if spawn(cmd, &mut running) {
+            processes.push(running);
+        }
+    }
+
     loop {
         let reaped_pids = process::reap_chd();
 
-        if let Some(active_pid) = shell_pid {
-            if reaped_pids.contains(&active_pid) {
-                println!("Shell (PID {}) exited. respawning...", active_pid);
-                shell_pid = spawn_shell();
+        for pid in reaped_pids {
+            let Some(service) = processes
+                .iter_mut()
+                .find(|process| process.process.contains(&pid))
+            else {
+                continue;
+            };
+
+            service.process.retain(|p| *p != pid);
+
+            match service.command.restart {
+                process::RestartPolicy::Never => {
+                    println!(
+                        "{} PID {} exited permanently",
+                        utils::boot_time(),
+                        pid
+                    );
+                }
+
+                process::RestartPolicy::Always => {
+                    println!(
+                        "{} PID {} exited, restarting {}...",
+                        utils::boot_time(),
+                        pid,
+                        service.command.path
+                    );
+
+                    let command = service.command.clone();
+                    spawn(command, service);
+                }
             }
-         }
+        }
 
         if let Err(e) = signal::wait() {
             eprintln!("failed to wait for signal: {e}");

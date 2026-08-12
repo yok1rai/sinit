@@ -18,27 +18,72 @@ pub fn setup_stdio() -> nix::Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum RestartPolicy {
+    Never,
+    Always
+}
+
+#[derive(Clone)]
+pub struct RunningProcess {
+    pub process: Vec<Pid>,
+    pub command: Command,
+}
 
 
-pub fn fork_exec(args: &str) -> nix::Result<(Pid, &str)> {
+#[derive(Clone, Debug)]
+pub struct Command {
+    pub path: String,
+    pub args: Vec<String>,
+    pub restart: RestartPolicy
+}
+
+impl Command {
+    pub fn new(args: Vec<&str>, restart: RestartPolicy) -> Option<Self> {
+        let path = *args.first()?;
+        Some(Self {
+            path: path.to_string(),
+            args: args.iter().map(|i| i.to_string()).collect(),
+            restart,
+        })
+    }
+}
+
+pub fn fork_exec(command: Command, process_list: &mut RunningProcess) -> nix::Result<Pid> {
     match unsafe { fork()? } {
         ForkResult::Child => {
             signal::sigprocmask(
                 signal::SigmaskHow::SIG_SETMASK,
                 Some(&SigSet::empty()),
-                None)?;
+                None,
+            )?;
+
             setsid()?;
 
             unsafe {
-                ioctl(0, TIOCSCTTY as _, 0);
+                if ioctl(0, TIOCSCTTY as _, 0) < 0 {
+                    return Err(nix::Error::last());
+                }
             }
 
-            let path = CString::new(args).unwrap();
-            execv(&path, &[path.clone()])?;
+            let args: Vec<CString> = command
+                .args
+                .iter()
+                .map(|arg| CString::new(arg.as_str()))
+                .collect::<Result<_, _>>()
+                .map_err(|_| nix::errno::Errno::EINVAL)?;
+
+            let path = &args[0];
+
+            execv(path, &args)?;
 
             unreachable!();
         }
-        ForkResult::Parent { child } => Ok((child, args))
+
+        ForkResult::Parent { child } => {
+            process_list.process.push(child);
+            Ok(child)
+        }
     }
 }
 

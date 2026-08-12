@@ -6,6 +6,6 @@ pub fn boot_time() -> String {
     format!(
         "[{}.{:06}]",
         ts.tv_sec(),
-        ts.tv_nsec() / 1_1000
+        ts.tv_nsec() / 1_000
     )
 }

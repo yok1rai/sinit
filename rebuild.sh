@@ -2,7 +2,7 @@
 set -e
 
 echo "==> Building sinit..."
-cargo build --release --target x86_64-unknown-linux-musl --features unsafe
+cargo build --release --target x86_64-unknown-linux-musl --features unsafe 
 
 echo "==> Copying sinit into initramfs..."
 cp target/x86_64-unknown-linux-musl/release/sinit initramfs/init

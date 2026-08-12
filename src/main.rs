@@ -25,6 +25,7 @@ fn spawn(
 }
 
 fn main() {
+    println!("* sinit started as PID {} {}", nix::unistd::getpid(), utils::boot_time());
     if let Err(e) = signal::init() {
         eprintln!("failed to initialize signal handling: {e}");
     }

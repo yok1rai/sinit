@@ -6,7 +6,7 @@ use nix::unistd::getuid;
         return;
     }
     if let Err(e) = std::fs::write("/etc/ipanic", b"") {
-        eprintln!("cannot clear the /etc/ipanic, canceling...");
+        eprintln!("cannot clear the /etc/ipanic: {e}, canceling...");
         return;
     }
     nix::unistd::sync();

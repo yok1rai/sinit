@@ -49,35 +49,48 @@ impl Command {
     }
 }
 
+use std::process::exit;
+
 pub fn fork_exec(command: Command, process_list: &mut RunningProcess) -> nix::Result<Pid> {
     match unsafe { fork()? } {
         ForkResult::Child => {
-            signal::sigprocmask(
+            if signal::sigprocmask(
                 signal::SigmaskHow::SIG_SETMASK,
                 Some(&SigSet::empty()),
                 None,
-            )?;
+            ).is_err() {
+                eprintln!("failed to reset sigprocmask in child");
+                exit(1);
+            }
 
-            setsid()?;
+            if setsid().is_err() {
+                eprintln!("setsid failed in child");
+                exit(1);
+            }
 
             unsafe {
                 if ioctl(0, TIOCSCTTY as _, 0) < 0 {
-                    return Err(nix::Error::last());
+                    eprintln!("ioctl TIOCSCTTY failed in child");
+                    exit(1);
                 }
             }
 
-            let args: Vec<CString> = command
+            let path = CString::new(command.path.as_str()).unwrap_or_else(|_| exit(1));
+
+            let args: Vec<CString> = match command
                 .args
                 .iter()
                 .map(|arg| CString::new(arg.as_str()))
                 .collect::<Result<_, _>>()
-                .map_err(|_| nix::errno::Errno::EINVAL)?;
+            {
+                Ok(a) => a,
+                Err(_) => exit(1),
+            };
 
-            let path = &args[0];
+            let err = execv(&path, &args).unwrap_err();
+            eprintln!("execv failed for '{}': {}", command.path, err);
 
-            execv(path, &args)?;
-
-            unreachable!();
+            exit(127);
         }
 
         ForkResult::Parent { child } => {

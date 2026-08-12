@@ -8,3 +8,4 @@
 # Generated/compiled initramfs binaries
 /initramfs/init
 /initramfs/bin/bash
+
